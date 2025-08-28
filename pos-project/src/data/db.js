@@ -21,7 +21,6 @@ export const initDB = async () => {
   const users = await getUsers();
   if (users.length === 0) {
     await createUser({
-      id: uuidv4(),
       username: 'admin',
       password: 'admin123',
       role: 'owner',
