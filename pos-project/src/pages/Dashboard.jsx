@@ -1,31 +1,29 @@
 // src/pages/Dashboard.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { getDashboardStats, getLowStockProducts, getSalesByDateRange } from '../data/db';
 import { BarChart3, Users, Package, DollarSign, AlertCircle, Calendar, TrendingUp } from 'lucide-react';
 
 const Dashboard = () => {
   const { currentUser, logout } = useAuth();
+  const navigate = useNavigate();
   const [stats, setStats] = useState({});
   const [lowStockProducts, setLowStockProducts] = useState([]);
   const [recentSales, setRecentSales] = useState([]);
   const [selectedDateRange, setSelectedDateRange] = useState('today');
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadDashboardData();
-  }, [selectedDateRange]);
-
-  const loadDashboardData = async () => {
+  // Wrap loadDashboardData in useCallback with proper dependencies
+  const loadDashboardData = useCallback(async () => {
     setLoading(true);
     try {
       const dashboardStats = await getDashboardStats();
       setStats(dashboardStats);
 
       const lowStock = await getLowStockProducts();
-      setLowStockProducts(lowStock.slice(0, 5)); // Show top 5 low stock items
+      setLowStockProducts(lowStock.slice(0, 5));
 
-      // Get sales for the selected date range
       let startDate, endDate;
       const today = new Date();
       
@@ -48,20 +46,30 @@ const Dashboard = () => {
       }
 
       const sales = await getSalesByDateRange(startDate, endDate);
-      setRecentSales(sales.slice(-10).reverse()); // Show last 10 sales
+      setRecentSales(sales.slice(-10).reverse());
 
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedDateRange]); // selectedDateRange is the only dependency
 
-  const StatCard = ({ icon: Icon, title, value, color = 'blue' }) => (
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]); // Now loadDashboardData is stable
+
+  // Navigation handlers
+  const handleNavigateToPOS = () => navigate('/pos');
+  const handleNavigateToInventory = () => navigate('/inventory');
+  const handleNavigateToCustomers = () => navigate('/customers');
+  const handleNavigateToSales = () => navigate('/sales');
+
+  const StatCard = ({ title, value, color = 'blue' }) => (
     <div className="bg-white rounded-lg shadow-md p-6">
       <div className="flex items-center">
         <div className={`p-3 rounded-full bg-${color}-100`}>
-          <Icon className={`h-6 w-6 text-${color}-600`} />
+       
         </div>
         <div className="ml-4">
           <p className="text-sm font-medium text-gray-600">{title}</p>
@@ -83,7 +91,6 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Header */}
       <header className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
@@ -105,7 +112,6 @@ const Dashboard = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Date Range Selector - Only for Owner */}
         {currentUser?.role === 'owner' && (
           <div className="mb-6 flex justify-between items-center">
             <h2 className="text-lg font-semibold text-gray-900">Performance Overview</h2>
@@ -121,7 +127,6 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* Statistics Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <StatCard
             icon={DollarSign}
@@ -136,7 +141,6 @@ const Dashboard = () => {
             color="blue"
           />
           
-          {/* Show different stats based on role */}
           {currentUser?.role === 'owner' && (
             <>
               <StatCard
@@ -173,7 +177,6 @@ const Dashboard = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Low Stock Alert - For all roles */}
           {(currentUser?.role === 'owner' || currentUser?.role === 'assistant') && lowStockProducts.length > 0 && (
             <div className="bg-white rounded-lg shadow-md p-6">
               <div className="flex items-center mb-4">
@@ -191,7 +194,6 @@ const Dashboard = () => {
             </div>
           )}
 
-          {/* Recent Sales - For all roles */}
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex items-center mb-4">
               <Calendar className="h-5 w-5 text-blue-500 mr-2" />
@@ -219,13 +221,12 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Quick Actions - Different based on role */}
           <div className="bg-white rounded-lg shadow-md p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
             <div className="grid grid-cols-2 gap-3">
               <button
-                onClick={() => window.location.href = '/pos'}
-                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-lg font-medium text-sm"
+                onClick={handleNavigateToPOS}
+                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-lg font-medium text-sm transition-colors"
               >
                 New Sale
               </button>
@@ -233,20 +234,20 @@ const Dashboard = () => {
               {currentUser?.role === 'owner' && (
                 <>
                   <button
-                    onClick={() => window.location.href = '/inventory'}
-                    className="bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-lg font-medium text-sm"
+                    onClick={handleNavigateToInventory}
+                    className="bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-lg font-medium text-sm transition-colors"
                   >
                     Manage Inventory
                   </button>
                   <button
-                    onClick={() => window.location.href = '/customers'}
-                    className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-3 rounded-lg font-medium text-sm"
+                    onClick={handleNavigateToCustomers}
+                    className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-3 rounded-lg font-medium text-sm transition-colors"
                   >
                     View Customers
                   </button>
                   <button
-                    onClick={() => window.location.href = '/sales'}
-                    className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-3 rounded-lg font-medium text-sm"
+                    onClick={handleNavigateToSales}
+                    className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-3 rounded-lg font-medium text-sm transition-colors"
                   >
                     Sales Reports
                   </button>
@@ -256,14 +257,14 @@ const Dashboard = () => {
               {currentUser?.role === 'assistant' && (
                 <>
                   <button
-                    onClick={() => window.location.href = '/inventory'}
-                    className="bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-lg font-medium text-sm"
+                    onClick={handleNavigateToInventory}
+                    className="bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-lg font-medium text-sm transition-colors"
                   >
                     Check Stock
                   </button>
                   <button
-                    onClick={() => window.location.href = '/sales'}
-                    className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-3 rounded-lg font-medium text-sm"
+                    onClick={handleNavigateToSales}
+                    className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-3 rounded-lg font-medium text-sm transition-colors"
                   >
                     My Sales
                   </button>
@@ -273,7 +274,6 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Owner-only Financial Summary */}
         {currentUser?.role === 'owner' && (
           <div className="mt-8 bg-white rounded-lg shadow-md p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Financial Summary</h3>
