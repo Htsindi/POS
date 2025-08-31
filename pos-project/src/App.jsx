@@ -13,7 +13,7 @@ import Customers from './pages/Customers';
 
 // A component to initialize the database and check auth status
 function AppContent() {
-  const { currentUser } = useAuth();
+  const { authLoading } = useAuth();
   const [isSeeding, setIsSeeding] = useState(false);
    const [isAppInitialized, setIsAppInitialized] = useState(false);
 
@@ -28,7 +28,7 @@ function AppContent() {
     initializeApp();
   }, []);
 
-  if (isSeeding || !isAppInitialized || currentUser) {
+  if (isSeeding || !isAppInitialized || authLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
