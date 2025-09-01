@@ -1,3 +1,4 @@
+// src/App.jsx
 import { useEffect, useState } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -11,29 +12,34 @@ import Inventory from './pages/Inventory';
 import SalesHistory from './pages/SalesHistory';
 import Customers from './pages/Customers';
 
-// A component to initialize the database and check auth status
 function AppContent() {
   const { authLoading } = useAuth();
   const [isSeeding, setIsSeeding] = useState(false);
-   const [isAppInitialized, setIsAppInitialized] = useState(false);
+  const [isAppInitialized, setIsAppInitialized] = useState(false);
 
-   useEffect(() => {
+  useEffect(() => {
     const initializeApp = async () => {
-      await initDB(); // Initialize the database
-      setIsSeeding(true);
-      await seedDatabase(); // Seed with dummy data
-      setIsSeeding(false);
-      setIsAppInitialized(true);
+      try {
+        await initDB();
+        setIsSeeding(true);
+        await seedDatabase();
+      } catch (error) {
+        console.error('App initialization error:', error);
+      } finally {
+        setIsSeeding(false);
+        setIsAppInitialized(true);
+      }
     };
     initializeApp();
   }, []);
 
+  // Show loading spinner while app is initializing or auth is loading
   if (isSeeding || !isAppInitialized || authLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading grocery data...</p>
+          <p className="mt-4 text-gray-600">Loading application...</p>
         </div>
       </div>
     );
@@ -42,48 +48,39 @@ function AppContent() {
   return (
     <div className="App">
       <Routes>
-        {/* Public route */}
         <Route path="/login" element={<Login />} />
-        
-        {/* Protected routes */}
         <Route path="/" element={
           <ProtectedRoute>
             <Dashboard />
           </ProtectedRoute>
         } />
-        
         <Route path="/pos" element={
           <ProtectedRoute>
             <POS />
           </ProtectedRoute>
         } />
-        
         <Route path="/inventory" element={
           <ProtectedRoute requiredRole="owner">
             <Inventory />
           </ProtectedRoute>
         } />
-        
         <Route path="/sales" element={
           <ProtectedRoute>
             <SalesHistory />
           </ProtectedRoute>
         } />
-        
         <Route path="/customers" element={
           <ProtectedRoute>
             <Customers />
           </ProtectedRoute>
         } />
-        
-        {/* Fallback route - redirect to login for any unknown paths */}
+        {/* Catch all route - redirect to login */}
         <Route path="*" element={<Login />} />
       </Routes>
     </div>
   );
 }
 
-// The main App component wrapped with the AuthProvider
 function App() {
   return (
     <AuthProvider>

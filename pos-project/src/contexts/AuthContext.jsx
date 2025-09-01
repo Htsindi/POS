@@ -14,42 +14,72 @@ export const useAuth = () => {
 
 export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(true);
 
   useEffect(() => {
-    // Check if a user is logged in from a previous session (stored in localStorage)
-    const savedUser = JSON.parse(localStorage.getItem('currentUser'));
-    if (savedUser) {
-      setCurrentUser(savedUser);
-    }
-    setLoading(false);
+    const checkAuthStatus = async () => {
+      try {
+        const savedUser = localStorage.getItem('currentUser');
+        if (savedUser) {
+          const user = JSON.parse(savedUser);
+          // Verify user still exists in database
+          const users = await getUsers();
+          const userExists = users.find(u => u.id === user.id);
+          if (userExists) {
+            setCurrentUser(user);
+          } else {
+            localStorage.removeItem('currentUser');
+          }
+        }
+      } catch (error) {
+        console.error('Auth check error:', error);
+        localStorage.removeItem('currentUser');
+      } finally {
+        setAuthLoading(false);
+      }
+    };
+
+    checkAuthStatus();
   }, []);
 
   const login = async (username, password) => {
-    const users = await getUsers();
-    const user = users.find(u => u.username === username && u.password === password);
-    if (user) {
-      setCurrentUser(user);
-      localStorage.setItem('currentUser', JSON.stringify(user));
-      return { success: true };
+    try {
+      const users = await getUsers();
+      const user = users.find(u => u.username === username && u.password === password);
+      
+      if (user) {
+        const { password: _, ...userWithoutPassword } = user;
+        setCurrentUser(userWithoutPassword);
+        localStorage.setItem('currentUser', JSON.stringify(userWithoutPassword));
+        return { success: true };
+      }
+      return { success: false, message: 'Invalid credentials' };
+    } catch (error) {
+      console.error('Login error:', error);
+      return { success: false, message: 'Login failed. Please try again.' };
     }
-    return { success: false, message: 'Invalid credentials' };
   };
 
   const logout = () => {
+    // Clear both state and localStorage
     setCurrentUser(null);
     localStorage.removeItem('currentUser');
+    
+    // Force a complete state reset by reloading the app
+    // This ensures all components re-initialize properly
+    window.location.href = '/login';
   };
 
   const value = {
     currentUser,
     login,
-    logout
+    logout,
+    authLoading
   };
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 };
