@@ -56,8 +56,29 @@ export const updateProduct = async (productId, updatedData) => {
   await setItems('products', updatedProducts);
 };
 
+export const deleteProduct = async (productId) => {
+  const products = await getProducts();
+  const updatedProducts = products.filter(product => product.id !== productId);
+  await setItems('products', updatedProducts);
+};
+
 export const updateProductStock = async (productId, newStock) => {
   await updateProduct(productId, { stock: newStock });
+};
+
+export const searchProducts = async (query) => {
+  const products = await getProducts();
+  const searchTerm = query.toLowerCase();
+  return products.filter(product =>
+    product.name.toLowerCase().includes(searchTerm) ||
+    (product.description && product.description.toLowerCase().includes(searchTerm)) ||
+    (product.barcode && product.barcode.includes(query))
+  );
+};
+
+export const getLowStockProducts = async (threshold = 10) => {
+  const products = await getProducts();
+  return products.filter(product => product.stock <= threshold);
 };
 
 // User functions - FIXED: Only one createUser function
