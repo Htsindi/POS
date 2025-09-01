@@ -21,6 +21,7 @@ export const initDB = async () => {
   const users = await getUsers();
   if (users.length === 0) {
     await createUser({
+      id: uuidv4(),
       username: 'admin',
       password: 'admin123',
       role: 'owner',
@@ -54,6 +55,7 @@ export const updateProduct = async (productId, updatedData) => {
     product.id === productId ? { ...product, ...updatedData } : product
   );
   await setItems('products', updatedProducts);
+  return updatedData;
 };
 
 export const deleteProduct = async (productId) => {
@@ -81,15 +83,15 @@ export const getLowStockProducts = async (threshold = 10) => {
   return products.filter(product => product.stock <= threshold);
 };
 
-// User functions - FIXED: Only one createUser function
+// User functions
 export const getUsers = () => getItems('users');
 
 export const createUser = async (newUser) => {
   const users = await getUsers();
   const userWithId = { 
     ...newUser, 
-    id: newUser.id || uuidv4(), // Use provided ID or generate new
-    fullName: newUser.fullName || '' // Ensure fullName exists
+    id: newUser.id || uuidv4(),
+    fullName: newUser.fullName || ''
   };
   const updatedUsers = [...users, userWithId];
   await setItems('users', updatedUsers);
@@ -106,7 +108,7 @@ export const createSale = async (newSale) => {
   const sales = await getSales();
   const saleWithId = {
     ...newSale,
-    id: newSale.id || uuidv4() // Use provided ID or generate new
+    id: newSale.id || uuidv4()
   };
   const updatedSales = [...sales, saleWithId];
   await setItems('sales', updatedSales);
@@ -182,20 +184,4 @@ export const getDashboardStats = async () => {
     totalProducts,
     totalCustomers
   };
-};
-
-// Additional utility functions
-export const searchProducts = async (query) => {
-  const products = await getProducts();
-  const searchTerm = query.toLowerCase();
-  return products.filter(product =>
-    product.name.toLowerCase().includes(searchTerm) ||
-    product.description.toLowerCase().includes(searchTerm) ||
-    product.barcode === query
-  );
-};
-
-export const getLowStockProducts = async (threshold = 10) => {
-  const products = await getProducts();
-  return products.filter(product => product.stock <= threshold);
 };
