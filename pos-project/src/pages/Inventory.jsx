@@ -1,19 +1,16 @@
 // src/pages/Inventory.jsx
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   getProducts, 
   saveProduct, 
   updateProduct, 
   deleteProduct, 
-  getLowStockProducts,
-  searchProducts 
+  getLowStockProducts
 } from '../data/db';
 import { ArrowLeft, Plus, Edit, Trash2, Search, Filter, AlertTriangle, Package, X } from 'lucide-react';
 
 const Inventory = () => {
-  const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
@@ -34,32 +31,7 @@ const Inventory = () => {
   const [categories, setCategories] = useState([]);
   const [showForm, setShowForm] = useState(false);
 
-  useEffect(() => {
-    loadProducts();
-  }, []);
-
-  useEffect(() => {
-    applyFilters();
-  }, [products, searchTerm, filterCategory, lowStockFilter]);
-
-  const loadProducts = async () => {
-    setLoading(true);
-    try {
-      const productsData = await getProducts();
-      setProducts(productsData || []);
-      
-      // Extract unique categories
-      const uniqueCategories = [...new Set(productsData.map(item => item.category))].filter(Boolean);
-      setCategories(uniqueCategories);
-    } catch (error) {
-      console.error('Error loading products:', error);
-      setProducts([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const applyFilters = async () => {
+  const applyFilters = useCallback(async () => {
     let filtered = [...products];
 
     // Search filter
@@ -85,6 +57,31 @@ const Inventory = () => {
     }
 
     setFilteredProducts(filtered);
+  }, [products, searchTerm, filterCategory, lowStockFilter]);
+
+  useEffect(() => {
+    loadProducts();
+  }, []);
+
+  useEffect(() => {
+    applyFilters();
+  }, [applyFilters]);
+
+  const loadProducts = async () => {
+    setLoading(true);
+    try {
+      const productsData = await getProducts();
+      setProducts(productsData || []);
+      
+      // Extract unique categories
+      const uniqueCategories = [...new Set(productsData.map(item => item.category))].filter(Boolean);
+      setCategories(uniqueCategories);
+    } catch (error) {
+      console.error('Error loading products:', error);
+      setProducts([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleInputChange = (e) => {

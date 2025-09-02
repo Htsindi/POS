@@ -1,9 +1,9 @@
 // src/pages/SalesHistory.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { getSales, getSalesByUserId, getSalesByDateRange, getUsers } from '../data/db';
-import { ArrowLeft, Filter, Download, Eye, User, Calendar, DollarSign, CreditCard } from 'lucide-react';
+import { getSales, getSalesByUserId, getUsers } from '../data/db';
+import { ArrowLeft, Filter, Download, Eye, User, Calendar, DollarSign, CreditCard, X } from 'lucide-react';
 
 const SalesHistory = () => {
   const { currentUser } = useAuth();
@@ -22,16 +22,7 @@ const SalesHistory = () => {
   const [selectedSale, setSelectedSale] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
-  useEffect(() => {
-    loadSalesData();
-    loadUsers();
-  }, []);
-
-  useEffect(() => {
-    applyFilters();
-  }, [sales, filters]);
-
-  const loadSalesData = async () => {
+  const loadSalesData = useCallback(async () => {
     setLoading(true);
     try {
       let salesData;
@@ -46,16 +37,16 @@ const SalesHistory = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentUser.role, currentUser.id]);
 
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     if (currentUser.role === 'owner') {
       const userList = await getUsers();
       setUsers(userList);
     }
-  };
+  }, [currentUser.role]);
 
-  const applyFilters = async () => {
+  const applyFilters = useCallback(async () => {
     let filtered = [...sales];
 
     // Date range filter
@@ -106,7 +97,16 @@ const SalesHistory = () => {
     }
 
     setFilteredSales(filtered);
-  };
+  }, [sales, filters, currentUser.role]);
+
+  useEffect(() => {
+    loadSalesData();
+    loadUsers();
+  }, [loadSalesData, loadUsers]);
+
+  useEffect(() => {
+    applyFilters();
+  }, [applyFilters]);
 
   const getSalespersonName = (userId) => {
     const user = users.find(u => u.id === userId);
