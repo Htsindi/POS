@@ -76,7 +76,7 @@ const POS = () => {
 
   const calculateTotals = () => {
     const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const tax = subtotal * 0.08; // 8% tax
+    const tax = subtotal * 0.00; // 8% tax
     const total = subtotal + tax;
     return {
       subtotal: parseFloat(subtotal.toFixed(2)),
@@ -290,7 +290,7 @@ const POS = () => {
                 <span>${subtotal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
-                <span>Tax (8%):</span>
+                <span>Tax (0%):</span>
                 <span>${tax.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-lg font-bold border-t pt-2">

@@ -154,6 +154,13 @@ export const updateCustomer = async (customerId, updatedData) => {
   await setItems('customers', updatedCustomers);
 };
 
+export const deleteCustomer = async (customerId) => {
+  const customers = await getCustomers();
+  const updatedCustomers = customers.filter(customer => customer.id !== customerId);
+  await setItems('customers', updatedCustomers);
+};
+
+
 export const updateCustomerBalance = async (customerId, newBalance) => {
   await updateCustomer(customerId, { currentBalance: parseFloat(newBalance.toFixed(2)) });
 };
