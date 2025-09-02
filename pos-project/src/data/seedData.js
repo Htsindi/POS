@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { getUsers, createUser, getProducts, saveProduct, getCustomers, createCustomer, setItems } from './db';
 
 // Generate random price between min and max
-const randomPrice = (min, max) => parseFloat((Math.random() * (max - min) + min).toFixed(2));
+//const randomPrice = (min, max) => parseFloat((Math.random() * (max - min) + min).toFixed(2));
 
 // Generate random stock quantity
 const randomStock = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
