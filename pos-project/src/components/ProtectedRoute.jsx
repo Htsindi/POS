@@ -1,42 +1,37 @@
-// src/components/ProtectedRoute.jsx
-import { useAuth } from '../contexts/AuthContext';
-import { Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Outlet } from 'react-router-dom';
+import { useAuth } from '@/lib/AuthContext';
+import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 
-const ProtectedRoute = ({ children, requiredRole }) => {
-  const { currentUser, authLoading } = useAuth();
+const DefaultFallback = () => (
+  <div className="fixed inset-0 flex items-center justify-center">
+    <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
+  </div>
+);
 
-  // Show nothing while checking authentication
-  if (authLoading) {
-    return null;
+export default function ProtectedRoute({ fallback = <DefaultFallback />, unauthenticatedElement }) {
+  const { isAuthenticated, isLoadingAuth, authChecked, authError, checkUserAuth } = useAuth();
+
+  useEffect(() => {
+    if (!authChecked && !isLoadingAuth) {
+      checkUserAuth();
+    }
+  }, [authChecked, isLoadingAuth, checkUserAuth]);
+
+  if (isLoadingAuth || !authChecked) {
+    return fallback;
   }
 
-  // Redirect to login if not authenticated
-  if (!currentUser) {
-    return <Navigate to="/login" replace />;
+  if (authError) {
+    if (authError.type === 'user_not_registered') {
+      return <UserNotRegisteredError />;
+    }
+    return unauthenticatedElement;
   }
 
-  // Check role-based access
-  if (requiredRole && currentUser.role !== requiredRole) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="bg-white p-6 rounded-lg shadow-md text-center">
-          <div className="text-red-500 text-4xl mb-4">⛔</div>
-          <h2 className="text-xl font-bold text-gray-800 mb-2">Access Denied</h2>
-          <p className="text-gray-600">
-            You need {requiredRole} privileges to access this page.
-          </p>
-          <button
-            onClick={() => window.location.href = '/'}
-            className="mt-4 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
-          >
-            Back to Dashboard
-          </button>
-        </div>
-      </div>
-    );
+  if (!isAuthenticated) {
+    return unauthenticatedElement;
   }
 
-  return children;
-};
-
-export default ProtectedRoute;
+  return <Outlet />;
+}
