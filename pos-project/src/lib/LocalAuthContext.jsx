@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { getDB, uid, put } from './db';
+import { buildCashRegisterSummary } from './cashRegister';
 
 const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
@@ -70,12 +71,115 @@ export function LocalAuthProvider({ children }) {
 
   const confirmCashRegister = async (amount) => {
     const amt = Number(amount) || 0;
+    const now = new Date().toISOString();
     setOpeningCash(amt);
     setRegisterOpen(false);
-    await put('cashRegister', { id: uid(), userId: user.id, userName: user.fullName, openingCash: amt, date: new Date().toISOString() });
+    await put('cashRegister', {
+      id: uid(),
+      userId: user.id,
+      userName: user.fullName,
+      openingCash: amt,
+      date: now,
+      openedAt: now,
+      cashSales: 0,
+      cardSales: 0,
+      creditSales: 0,
+      cashOuts: 0,
+      closingCash: amt,
+      closedAt: null,
+      status: 'open',
+    });
   };
 
-  const logout = () => {
+  const updateActiveRegister = async (updater) => {
+    if (!user?.id) return null;
+    const db = await getDB();
+    const all = await db.getAll('cashRegister');
+    const active = all
+      .filter((entry) => entry.userId === user.id && !entry.closedAt)
+      .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))[0];
+
+    if (!active) return null;
+
+    const next = updater(active);
+    await put('cashRegister', next);
+    return next;
+  };
+
+  const recordSaleToRegister = async (sale) => {
+    if (!sale) return null;
+    const amount = Number(sale.total) || 0;
+    return updateActiveRegister((active) => {
+      const nextCashSales = Number(active.cashSales || 0) + (sale.paymentMethod === 'cash' ? amount : 0);
+      const nextCardSales = Number(active.cardSales || 0) + (sale.paymentMethod === 'card' ? amount : 0);
+      const nextCreditSales = Number(active.creditSales || 0) + (sale.paymentMethod === 'credit' ? amount : 0);
+      const summary = buildCashRegisterSummary({
+        openingCash: Number(active.openingCash) || 0,
+        cashSales: nextCashSales,
+        cardSales: nextCardSales,
+        creditSales: nextCreditSales,
+        cashOuts: Number(active.cashOuts) || 0,
+      });
+      return {
+        ...active,
+        ...summary,
+        cashSales: nextCashSales,
+        cardSales: nextCardSales,
+        creditSales: nextCreditSales,
+        status: 'open',
+        lastUpdated: new Date().toISOString(),
+      };
+    });
+  };
+
+  const recordCashOutToRegister = async (amount) => {
+    const value = Number(amount) || 0;
+    if (!value) return null;
+    return updateActiveRegister((active) => {
+      const nextCashOuts = Number(active.cashOuts || 0) + value;
+      const summary = buildCashRegisterSummary({
+        openingCash: Number(active.openingCash) || 0,
+        cashSales: Number(active.cashSales) || 0,
+        cardSales: Number(active.cardSales) || 0,
+        creditSales: Number(active.creditSales) || 0,
+        cashOuts: nextCashOuts,
+      });
+      return {
+        ...active,
+        ...summary,
+        cashOuts: nextCashOuts,
+        status: 'open',
+        lastUpdated: new Date().toISOString(),
+      };
+    });
+  };
+
+  const logout = async () => {
+    if (user?.id) {
+      const db = await getDB();
+      const all = await db.getAll('cashRegister');
+      const active = all
+        .filter((entry) => entry.userId === user.id && !entry.closedAt)
+        .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))[0];
+
+      if (active) {
+        const summary = buildCashRegisterSummary({
+          openingCash: Number(active.openingCash) || 0,
+          cashSales: Number(active.cashSales) || 0,
+          cardSales: Number(active.cardSales) || 0,
+          creditSales: Number(active.creditSales) || 0,
+          cashOuts: Number(active.cashOuts) || 0,
+        });
+        await put('cashRegister', {
+          ...active,
+          ...summary,
+          status: 'closed',
+          closedAt: new Date().toISOString(),
+          closingCash: summary.closingCash,
+        });
+      }
+    }
+
     localStorage.removeItem('pos_session');
     setUser(null);
     setOpeningCash(null);
@@ -91,7 +195,7 @@ export function LocalAuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, registerOpen, openingCash, login, confirmCashRegister, logout }}>
+    <AuthContext.Provider value={{ user, registerOpen, openingCash, login, confirmCashRegister, recordSaleToRegister, recordCashOutToRegister, logout }}>
       {children}
     </AuthContext.Provider>
   );

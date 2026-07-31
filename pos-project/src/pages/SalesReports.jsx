@@ -101,7 +101,7 @@ export default function SalesReports() {
       { name: 'Salesperson', rows: bySalesperson },
       { name: 'Expenses', rows: periodExpenses.map((e) => ({ Date: e.date, Type: e.type, Description: e.description, Amount: e.amount })) },
       { name: 'Cashouts', rows: cashoutsByReason },
-      { name: 'Register', rows: periodRegister.map((r) => ({ Date: r.date, User: r.userName, OpeningCash: r.openingCash })) },
+      { name: 'Register', rows: periodRegister.map((r) => ({ Date: r.date, User: r.userName, OpeningCash: r.openingCash, CashSales: r.cashSales, CardSales: r.cardSales, CreditSales: r.creditSales, CashOuts: r.cashOuts, ClosingCash: r.closingCash })) },
     ]);
   };
 
@@ -186,7 +186,7 @@ export default function SalesReports() {
         <div className="grid lg:grid-cols-2 gap-6">
           <TableCard title="Expenses by Period" rows={periodExpenses} cols={[['Date', (e) => dateLabel(e.date)], ['Type', (e) => e.type], ['Description', (e) => e.description], ['Amount', (e) => money(e.amount), 'right']]} />
           <TableCard title="Cash Out by Reason" rows={cashoutsByReason} cols={[['Reason', (c) => c.reason], ['Count', (c) => c.count, 'right'], ['Amount', (c) => money(c.amount), 'right']]} />
-          <TableCard title="Start Cash Register" rows={periodRegister} cols={[['Date', (r) => dateLabel(r.date)], ['User', (r) => r.userName], ['Opening Cash', (r) => money(r.openingCash), 'right']]} />
+          <TableCard title="Cash Register Activity" rows={periodRegister} cols={[['Date', (r) => dateLabel(r.date)], ['User', (r) => r.userName], ['Opening', (r) => money(r.openingCash), 'right'], ['Cash Sales', (r) => money(r.cashSales), 'right'], ['Card Sales', (r) => money(r.cardSales), 'right'], ['Credit Sales', (r) => money(r.creditSales), 'right'], ['Cash Outs', (r) => money(r.cashOuts), 'right'], ['Closing', (r) => money(r.closingCash), 'right']]} />
         </div>
       </main>
     </div>

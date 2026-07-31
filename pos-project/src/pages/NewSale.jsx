@@ -9,9 +9,10 @@ import { getAll, put, uid } from '@/lib/db';
 import { money } from '@/lib/format';
 import { printReceipt, getSettings } from '@/lib/print';
 import { useAuth } from '@/lib/LocalAuthContext';
+import { calculateVoucherBasketAmount } from '@/lib/voucherCharges';
 
 export default function NewSale() {
-  const { user, openingCash } = useAuth();
+  const { user, recordSaleToRegister, recordCashOutToRegister } = useAuth();
   const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -100,6 +101,7 @@ export default function NewSale() {
       status: 'completed',
     };
     await put('sales', sale);
+    await recordSaleToRegister(sale);
 
     // decrement stock
     for (const it of cart) {
@@ -127,16 +129,26 @@ export default function NewSale() {
     const newBal = Math.max(0, (Number(c.balance) || 0) - amt);
     await put('customers', { ...c, balance: newBal });
     await put('cashouts', { id: uid(), amount: amt, reason: `Credit settlement: ${c.name}`, date: new Date().toISOString(), userId: user.id, userName: user.fullName });
+    await recordCashOutToRegister(amt);
     setCustomers((cs) => cs.map((x) => (x.id === c.id ? { ...x, balance: newBal } : x)));
     alert(`${money(amt)} settled. New balance: ${money(newBal)}`);
     reset();
   };
 
-  const addVoucherLine = (amount) => {
-    setCart((c) => [...c, { productId: 'voucher-' + uid(), name: 'Voucher', price: amount, cost: 0, qty: 1, stock: 999 }]);
+  const addChargeLine = async (amount, label) => {
+    const voucherCharges = await getAll('vouchers');
+    const basketAmount = calculateVoucherBasketAmount(amount, voucherCharges);
+    setCart((c) => [...c, { productId: `${label.toLowerCase().replace(/\s+/g, '-')}-${uid()}`, name: label, price: basketAmount, cost: 0, qty: 1, stock: 999 }]);
   };
+
+  const addVoucherLine = async (amount) => {
+    await addChargeLine(amount, 'Voucher');
+  };
+
   const recordCashback = async (amount, reason) => {
+    await addChargeLine(amount, 'Cash Back');
     await put('cashouts', { id: uid(), amount, reason: reason || 'Cash back', date: new Date().toISOString(), userId: user.id, userName: user.fullName });
+    await recordCashOutToRegister(amount);
     alert(`${money(amount)} cash back recorded.`);
   };
 
@@ -157,7 +169,7 @@ export default function NewSale() {
           <Button variant="outline" onClick={() => setVoucherOpen(true)}><Wallet className="w-4 h-4 mr-1" /> Voucher / Cash Back</Button>
         }
       />
-      <main className="max-w-7xl mx-auto w-full px-4 md:px-6 py-6 grid lg:grid-cols-3 gap-6 flex-1">
+      <main className="max-w-7xl mx-auto w-full px-4 md:px-6 py-4 grid lg:grid-cols-3 gap-4 flex-1">
         {/* Left: search + cart */}
         <div className="lg:col-span-2 space-y-4">
           <div className="relative">
@@ -222,36 +234,36 @@ export default function NewSale() {
         </div>
 
         {/* Right: order summary + payment */}
-        <div className="space-y-4">
-          <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-3">
-            <h3 className="font-semibold text-slate-900">Order Summary</h3>
-            <div className="flex justify-between text-sm text-slate-600"><span>Subtotal</span><span>{money(subtotal)}</span></div>
-            <div className="flex justify-between text-lg font-bold text-slate-900 border-t border-slate-100 pt-3"><span>Total</span><span className="text-emerald-600">{money(total)}</span></div>
-            <div className="text-xs text-slate-400">Opening cash: {money(openingCash || 0)}</div>
+        <div className="space-y-3">
+          <div className="bg-white rounded-xl border border-slate-200 p-3 space-y-2">
+            <h3 className="text-sm font-semibold text-slate-900">Order Summary</h3>
+            <div className="flex justify-between text-xs text-slate-600"><span>Subtotal</span><span>{money(subtotal)}</span></div>
+            <div className="flex justify-between text-base font-bold text-slate-900 border-t border-slate-100 pt-2"><span>Total</span><span className="text-emerald-600">{money(total)}</span></div>
+            <div className="text-[11px] text-slate-400">Opening cash: {money(openingCash || 0)}</div>
           </div>
 
           {/* Payment */}
-          <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-3">
-            <h3 className="font-semibold text-slate-900">Payment Method</h3>
+          <div className="bg-white rounded-xl border border-slate-200 p-3 space-y-2">
+            <h3 className="text-sm font-semibold text-slate-900">Payment Method</h3>
             {cart.length === 0 ? (
               <p className="text-sm text-slate-400">Add items to start a sale.</p>
             ) : !payMethod ? (
               <div className="grid grid-cols-1 gap-2">
-                <Button className="justify-start h-11 bg-emerald-600 hover:bg-emerald-700" onClick={() => completeSale('cash')}><DollarSign className="w-4 h-4 mr-2" /> Cash Payment</Button>
-                <Button className="justify-start h-11 bg-indigo-600 hover:bg-indigo-700" onClick={() => completeSale('card')}><CreditCard className="w-4 h-4 mr-2" /> Card Payment</Button>
-                <Button className="justify-start h-11 bg-amber-600 hover:bg-amber-700" onClick={() => completeSale('credit')}><BookOpen className="w-4 h-4 mr-2" /> Buy with Credit</Button>
+                <Button className="justify-start h-9 text-sm bg-emerald-600 hover:bg-emerald-700" onClick={() => completeSale('cash')}><DollarSign className="w-4 h-4 mr-2" /> Cash Payment</Button>
+                <Button className="justify-start h-9 text-sm bg-indigo-600 hover:bg-indigo-700" onClick={() => completeSale('card')}><CreditCard className="w-4 h-4 mr-2" /> Card Payment</Button>
+                <Button className="justify-start h-9 text-sm bg-amber-600 hover:bg-amber-700" onClick={() => completeSale('credit')}><BookOpen className="w-4 h-4 mr-2" /> Buy with Credit</Button>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium capitalize">{payMethod} Payment</span>
-                  <Button variant="ghost" size="sm" onClick={() => { setPayMethod(null); setPaid(''); setCreditCustomer(''); }}>Change</Button>
+                  <span className="text-xs font-medium capitalize">{payMethod} Payment</span>
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => { setPayMethod(null); setPaid(''); setCreditCustomer(''); }}>Change</Button>
                 </div>
 
                 {payMethod === 'credit' && (
-                  <div className="space-y-1.5">
-                    <Label>Customer (credit account)</Label>
-                    <select className="w-full h-10 rounded-md border border-slate-200 px-3 text-sm" value={creditCustomer} onChange={(e) => setCreditCustomer(e.target.value)}>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Customer (credit account)</Label>
+                    <select className="w-full h-9 rounded-md border border-slate-200 px-3 text-sm" value={creditCustomer} onChange={(e) => setCreditCustomer(e.target.value)}>
                       <option value="">Select customer...</option>
                       {customers.map((c) => <option key={c.id} value={c.id}>{c.name} — Bal: {money(c.balance || 0)}</option>)}
                     </select>
@@ -260,24 +272,24 @@ export default function NewSale() {
                 )}
 
                 {(payMethod === 'cash' || payMethod === 'credit') && (
-                  <div className="space-y-1.5">
-                    <Label>{payMethod === 'cash' ? 'Cash Received' : 'Amount to Settle'}</Label>
-                    <Input type="number" step="0.01" value={paid} onChange={(e) => setPaid(e.target.value)} placeholder="0.00" className="h-11" autoFocus />
+                  <div className="space-y-1">
+                    <Label className="text-xs">{payMethod === 'cash' ? 'Cash Received' : 'Amount to Settle'}</Label>
+                    <Input type="number" step="0.01" value={paid} onChange={(e) => setPaid(e.target.value)} placeholder="0.00" className="h-9" autoFocus />
                   </div>
                 )}
 
                 {payMethod === 'cash' && (
-                  <div className="flex justify-between text-sm"><span>Change Due</span><span className="font-bold text-emerald-600">{money(changeDue)}</span></div>
+                  <div className="flex justify-between text-xs"><span>Change Due</span><span className="font-bold text-emerald-600">{money(changeDue)}</span></div>
                 )}
                 {payMethod === 'credit' && (
-                  <div className="flex justify-between text-sm"><span>Balance Owed</span><span className="font-bold text-amber-600">{money(total)}</span></div>
+                  <div className="flex justify-between text-xs"><span>Balance Owed</span><span className="font-bold text-amber-600">{money(total)}</span></div>
                 )}
 
-                <Button className="w-full h-11 bg-emerald-600 hover:bg-emerald-700" onClick={finalize}>
+                <Button className="w-full h-9 text-sm bg-emerald-600 hover:bg-emerald-700" onClick={finalize}>
                   {payMethod === 'credit' ? 'Record Credit Sale' : payMethod === 'card' ? 'Complete Card Sale' : 'Complete Cash Sale'}
                 </Button>
                 {payMethod === 'cash' && creditCustomer && (
-                  <Button variant="outline" className="w-full h-10" onClick={settleCredit}>Settle This Customer's Credit</Button>
+                  <Button variant="outline" className="w-full h-9 text-sm" onClick={settleCredit}>Settle This Customer's Credit</Button>
                 )}
               </div>
             )}

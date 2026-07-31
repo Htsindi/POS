@@ -28,8 +28,9 @@ export default function TopBar({ title, showBack = false, actions }) {
                 {isAdmin ? 'Admin' : 'Assistant'}
               </span>
             </div>
-            <Button variant="ghost" size="icon" onClick={logout} aria-label="Logout">
+            <Button variant="ghost" className="gap-2" onClick={logout} aria-label="Logout">
               <LogOut className="w-4 h-4" />
+              <span className="hidden sm:inline">Logout</span>
             </Button>
           </div>
         </div>

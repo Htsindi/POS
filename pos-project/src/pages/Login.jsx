@@ -84,7 +84,7 @@ export default function Login() {
           </form>
 
           <div className="mt-6 pt-4 border-t border-slate-100 text-xs text-slate-400 text-center">
-            Default admin &mdash; <span className="font-medium text-slate-500">admin / admin123</span>
+            Default admin &mdash; <span className="font-medium text-slate-500">Welcome</span>
           </div>
         </div>
         <p className="text-center text-emerald-200/50 text-xs mt-6">Works offline &middot; Local storage only</p>
