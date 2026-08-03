@@ -10,7 +10,7 @@ import CrudList from '@/components/CrudList';
 import { useAuth } from '@/lib/LocalAuthContext';
 
 export default function Settings() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [shop, setShop] = useState({ shopName: '', appName: 'Grocery_POS', developer: 'matefortechnology', commissionRate: 0 });
   const [users, setUsers] = useState([]);
   const [editingUser, setEditingUser] = useState(null);
@@ -125,8 +125,26 @@ export default function Settings() {
         </div>
 
         {/* Charges CRUD */}
-        <CrudList store="vouchers" title="Voucher Charges / Interest" description="Charges applied when selling vouchers." fields={[{ key: 'name', label: 'Name' }, { key: 'percentage', label: 'Percentage (%)', type: 'number', suffix: '%' }]} />
-        <CrudList store="cardCharges" title="Card Purchase Charges" description="Fees applied to card payments." fields={[{ key: 'name', label: 'Name' }, { key: 'percentage', label: 'Percentage (%)', type: 'number', suffix: '%' }]} />
+        <CrudList
+          store="vouchers"
+          title="Voucher Charges / Interest"
+          description="Charges applied when selling vouchers. Max charge caps the fee amount in rand."
+          fields={[
+            { key: 'name', label: 'Name' },
+            { key: 'percentage', label: 'Percentage (%)', type: 'number', suffix: '%' },
+            { key: 'maxChargeAmount', label: 'Max Charge (R)', type: 'number', suffix: ' R' },
+          ]}
+        />
+        <CrudList
+          store="cardCharges"
+          title="Card Purchase Charges"
+          description="Fees applied to card payments. Max charge caps the fee amount in rand."
+          fields={[
+            { key: 'name', label: 'Name' },
+            { key: 'percentage', label: 'Percentage (%)', type: 'number', suffix: '%' },
+            { key: 'maxChargeAmount', label: 'Max Charge (R)', type: 'number', suffix: ' R' },
+          ]}
+        />
         <CrudList store="expenseTypes" title="Expense Types" description="Categories for recording expenses." fields={[{ key: 'name', label: 'Name' }]} />
 
         {/* Data management */}

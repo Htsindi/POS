@@ -6,7 +6,7 @@ export async function getSettings() {
   return s || { shopName: "Memo's Mart", appName: 'Grocery_POS', developer: 'matefortechnology' };
 }
 
-export function printReceipt(sale, settings) {
+export function printReceipt(sale, settings, existingWindow) {
   const shop = settings || { shopName: "Memo's Mart", appName: 'Grocery_POS', developer: 'matefortechnology' };
   const rows = (sale.items || [])
     .map((it) => `<tr><td style="padding:2px 0">${escapeHtml(it.name)} x${it.qty}</td><td style="text-align:right;white-space:nowrap">${money(it.price * it.qty)}</td></tr>`)
@@ -35,8 +35,12 @@ export function printReceipt(sale, settings) {
     ${sale.creditBalance ? `<div class="row"><span>Balance Owed</span><span>${money(sale.creditBalance)}</span></div>` : ''}
     <div class="center muted" style="margin-top:8px">Thank you for shopping with us!</div>
   </body></html>`;
-  const w = window.open('', '_blank', 'width=360,height=640');
+  const w = existingWindow || window.open('', '_blank', 'width=360,height=640');
   if (!w) {
+    alert('Please allow popups to print receipts.');
+    return;
+  }
+  if (existingWindow && existingWindow.closed) {
     alert('Please allow popups to print receipts.');
     return;
   }

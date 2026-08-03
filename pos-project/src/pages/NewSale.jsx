@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Search, Trash2, Plus, Minus, ArrowLeft, Wallet, CreditCard, BookOpen, Printer, X, DollarSign } from 'lucide-react';
 import TopBar from '@/components/TopBar';
 import { Button } from '@/components/ui/button';
@@ -9,11 +8,10 @@ import { getAll, put, uid } from '@/lib/db';
 import { money } from '@/lib/format';
 import { printReceipt, getSettings } from '@/lib/print';
 import { useAuth } from '@/lib/LocalAuthContext';
-import { calculateVoucherBasketAmount } from '@/lib/voucherCharges';
+import { calculateAppliedChargeAmount, calculateVoucherBasketAmount } from '@/lib/voucherCharges';
 
 export default function NewSale() {
-  const { user, recordSaleToRegister, recordCashOutToRegister } = useAuth();
-  const navigate = useNavigate();
+  const { user, openingCash, recordSaleToRegister, recordCashOutToRegister } = useAuth();
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [query, setQuery] = useState('');
@@ -23,6 +21,7 @@ export default function NewSale() {
   const [creditCustomer, setCreditCustomer] = useState('');
   const [voucherOpen, setVoucherOpen] = useState(false);
   const [lastSale, setLastSale] = useState(null);
+  const [cardChargeAmount, setCardChargeAmount] = useState(0);
 
   useEffect(() => {
     (async () => {
@@ -66,32 +65,48 @@ export default function NewSale() {
 
   const removeItem = (productId) => setCart((c) => c.filter((i) => i.productId !== productId));
 
-  const reset = () => { setCart([]); setPaid(''); setPayMethod(null); setCreditCustomer(''); };
+  const reset = () => { setCart([]); setPaid(''); setPayMethod(null); setCreditCustomer(''); setCardChargeAmount(0); };
 
   const completeSale = async (method) => {
     if (cart.length === 0) return alert('Cart is empty.');
+
+    if (method === 'card') {
+      const cardCharges = await getAll('cardCharges');
+      const nextCardChargeAmount = calculateAppliedChargeAmount(total, cardCharges);
+      setCardChargeAmount(nextCardChargeAmount);
+    } else {
+      setCardChargeAmount(0);
+    }
+
     setPayMethod(method);
   };
 
   const finalize = async () => {
     if (cart.length === 0) return;
+
+    const cardCharges = payMethod === 'card' ? await getAll('cardCharges') : [];
+    const cardChargeAmount = payMethod === 'card' ? calculateAppliedChargeAmount(total, cardCharges) : 0;
+    const saleTotal = payMethod === 'card' ? calculateVoucherBasketAmount(total, cardCharges) : total;
+
     let paidAmount = 0, change = 0, creditBalance = 0, customerId = null;
     if (payMethod === 'cash') {
       paidAmount = Number(paid) || 0;
-      if (paidAmount < total) return alert('Cash amount is less than total.');
-      change = paidAmount - total;
+      if (paidAmount < saleTotal) return alert('Cash amount is less than total.');
+      change = paidAmount - saleTotal;
     } else if (payMethod === 'card') {
-      paidAmount = total;
+      paidAmount = saleTotal;
     } else if (payMethod === 'credit') {
       if (!creditCustomer) return alert('Select a customer for credit sale.');
       customerId = creditCustomer;
-      creditBalance = total;
+      creditBalance = saleTotal;
       paidAmount = 0;
     }
     const sale = {
       id: uid(),
-      items: cart.map(({ stock, ...rest }) => rest),
-      subtotal, total,
+      items: cart.map(({ ...rest }) => rest),
+      subtotal,
+      total: saleTotal,
+      cardChargeAmount,
       paymentMethod: payMethod,
       paidAmount, change, creditBalance,
       customerId: customerId || null,
@@ -135,30 +150,39 @@ export default function NewSale() {
     reset();
   };
 
-  const addChargeLine = async (amount, label) => {
-    const voucherCharges = await getAll('vouchers');
-    const basketAmount = calculateVoucherBasketAmount(amount, voucherCharges);
+  const addChargeLine = async (amount, label, chargeStore = 'vouchers') => {
+    const charges = await getAll(chargeStore);
+    const basketAmount = calculateVoucherBasketAmount(amount, charges);
     setCart((c) => [...c, { productId: `${label.toLowerCase().replace(/\s+/g, '-')}-${uid()}`, name: label, price: basketAmount, cost: 0, qty: 1, stock: 999 }]);
   };
 
+  const addCashbackLine = async (amount) => {
+    setCart((c) => [...c, { productId: `cash-back-${uid()}`, name: 'Cash Back', price: Number(amount) || 0, cost: 0, qty: 1, stock: 999 }]);
+  };
+
   const addVoucherLine = async (amount) => {
-    await addChargeLine(amount, 'Voucher');
+    await addChargeLine(amount, 'Voucher', 'vouchers');
   };
 
   const recordCashback = async (amount, reason) => {
-    await addChargeLine(amount, 'Cash Back');
+    await addCashbackLine(amount);
     await put('cashouts', { id: uid(), amount, reason: reason || 'Cash back', date: new Date().toISOString(), userId: user.id, userName: user.fullName });
     await recordCashOutToRegister(amount);
     alert(`${money(amount)} cash back recorded.`);
   };
 
   const doPrint = async () => {
+    const receiptWindow = window.open('', '_blank', 'width=360,height=640');
     const settings = await getSettings();
-    printReceipt(lastSale, settings);
+    printReceipt(lastSale, settings, receiptWindow);
   };
 
   const owed = payMethod === 'credit' ? total : 0;
   const changeDue = payMethod === 'cash' && Number(paid) >= total ? (Number(paid) - total) : 0;
+  const displayTotal = payMethod === 'card' ? total + cardChargeAmount : total;
+  const printReceiptButton = lastSale ? (
+    <Button variant="outline" className="bg-transparent border-slate-600 text-white hover:bg-slate-800" onClick={doPrint}><Printer className="w-4 h-4 mr-1" /> Print Last Receipt</Button>
+  ) : null;
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -238,7 +262,10 @@ export default function NewSale() {
           <div className="bg-white rounded-xl border border-slate-200 p-3 space-y-2">
             <h3 className="text-sm font-semibold text-slate-900">Order Summary</h3>
             <div className="flex justify-between text-xs text-slate-600"><span>Subtotal</span><span>{money(subtotal)}</span></div>
-            <div className="flex justify-between text-base font-bold text-slate-900 border-t border-slate-100 pt-2"><span>Total</span><span className="text-emerald-600">{money(total)}</span></div>
+            {payMethod === 'card' && (
+              <div className="flex justify-between text-xs text-slate-600"><span>Card Purchase Charge</span><span>{money(cardChargeAmount)}</span></div>
+            )}
+            <div className="flex justify-between text-base font-bold text-slate-900 border-t border-slate-100 pt-2"><span>Total</span><span className="text-emerald-600">{money(displayTotal)}</span></div>
             <div className="text-[11px] text-slate-400">Opening cash: {money(openingCash || 0)}</div>
           </div>
 
@@ -257,7 +284,7 @@ export default function NewSale() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium capitalize">{payMethod} Payment</span>
-                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => { setPayMethod(null); setPaid(''); setCreditCustomer(''); }}>Change</Button>
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => { setPayMethod(null); setPaid(''); setCreditCustomer(''); setCardChargeAmount(0); }}>Change</Button>
                 </div>
 
                 {payMethod === 'credit' && (
@@ -276,6 +303,10 @@ export default function NewSale() {
                     <Label className="text-xs">{payMethod === 'cash' ? 'Cash Received' : 'Amount to Settle'}</Label>
                     <Input type="number" step="0.01" value={paid} onChange={(e) => setPaid(e.target.value)} placeholder="0.00" className="h-9" autoFocus />
                   </div>
+                )}
+
+                {payMethod === 'card' && (
+                  <div className="flex justify-between text-xs"><span>Card Purchase Charge</span><span className="font-bold text-indigo-600">{money(cardChargeAmount)}</span></div>
                 )}
 
                 {payMethod === 'cash' && (
@@ -307,9 +338,7 @@ export default function NewSale() {
           <div className="flex items-center gap-6 text-sm">
             {changeDue > 0 && <div className="text-emerald-300">Change: <span className="font-bold">{money(changeDue)}</span></div>}
             {owed > 0 && <div className="text-amber-300">Owed: <span className="font-bold">{money(owed)}</span></div>}
-            {lastSale && (
-            <Button variant="outline" className="bg-transparent border-slate-600 text-white hover:bg-slate-800" onClick={doPrint}><Printer className="w-4 h-4 mr-1" /> Print Last Receipt</Button>
-          )}
+            {printReceiptButton}
           </div>
         </div>
       </div>

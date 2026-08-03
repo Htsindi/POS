@@ -35,7 +35,7 @@ export const seedDatabase = async () => {
         password: 'assist123',
         role: 'assistant',
         pin: '1234',
-        fullName: 'John SmithTshiamo Sebueng'
+        fullName: 'Tshiamo Sebueng'
       },
       {
         id: uuidv4(),
